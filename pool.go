@@ -111,7 +111,7 @@ func (p *pool[T]) Return(ins *T, bad bool) error {
 	}
 	if p.config.TestOnReturn {
 		if err := p.lilo.valid(ins); err != nil {
-			p.logFunc()("Return invalid obj, ping failed, obj is:%v", wrap)
+			p.logFunc()("Return invalid obj, ping failed, obj is:%v,err:%v", wrap, err)
 			p.lilo.destroyObj(ins)
 			return err
 		}
@@ -139,7 +139,7 @@ func (p *pool[T]) quickBorrow() *T {
 	}
 	if p.config.TestOnBorrow {
 		if err := p.lilo.valid(o.obj); err != nil {
-			p.logFunc()("Borrow pooled object,but Valid failed,to create")
+			p.logFunc()("Borrow pooled object,but Valid failed,to create,err:%v", err)
 			p.lilo.destroyObj(o.obj)
 			return nil
 		}
@@ -431,6 +431,14 @@ func newSema(max int) *semaWithCounter {
 }
 
 func (sc *semaWithCounter) acquire(d time.Duration) (bool, int64) {
+	if d == 0 {
+		return sc.quickAcquire()
+	}
+	if d < 0 {
+		sc.ch <- struct{}{}
+		c := sc.counter.Add(1)
+		return true, c
+	}
 	select {
 	case sc.ch <- struct{}{}:
 		c := sc.counter.Add(1)
